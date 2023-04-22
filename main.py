@@ -16,6 +16,11 @@ from torch_geometric.data import DataLoader
 import torch_geometric.nn as pyg_nn
 import os.path as osp
 from torch_geometric.data import InMemoryDataset, download_url
+from torch_geometric.transforms import RandomLinkSplit
+from torch_geometric.nn import GAE
+
+from torch_geometric.utils import train_test_split_edges
+# from torch.utils.tensorboard import SummaryWriter
 
 
 edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/edge_features.xlsx'
@@ -178,65 +183,175 @@ print(dataset[0].num_features) # 8
 data_list = [dataset[0]]
 data = dataset[0]
 print(data)
-loader = DataLoader(data_list, batch_size=1)
+print(type(data))
 
-#  定义2层GCN的网络.
-class Net(torch.nn.Module):
-    def __init__(self):
-        super(Net, self).__init__()
-        self.conv1 = GCNConv(dataset.num_node_features, 16)
-        self.conv2 = GCNConv(16, dataset.num_classes)
+# transform = RandomLinkSplit(is_undirected=True)
+# print(type(data))
+# data = transform(data)
+data = train_test_split_edges(data)
+print(data)
+print(type(data))
+# loader = DataLoader(data_list, batch_size=1)
+
+# #  定义2层GCN的网络.
+# class Net(torch.nn.Module):
+#     def __init__(self):
+#         super(Net, self).__init__()
+#         self.conv1 = GCNConv(dataset.num_node_features, 16)
+#         self.conv2 = GCNConv(16, dataset.num_classes)
     
     
-    def forward(self):
-        x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr  #赋值data.x特征向量edge_index图的形状，edge_attr权重矩阵
+#     def forward(self):
+#         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr  #赋值data.x特征向量edge_index图的形状，edge_attr权重矩阵
 
-        x = self.conv1(x, edge_index, edge_weight)
-        x = F.relu(x)   
-        #x,edge_index,edge_weight特征矩阵，邻接矩阵，权重矩阵组成GCN核心公式
-        x = F.dropout(x, training=self.training)   #用dropout函数防止过拟合
-        x = self.conv2(x, edge_index, edge_weight)  #输出
-        print(x)
-        return x
-        #x为节点的embedding
+#         x = self.conv1(x, edge_index, edge_weight)
+#         x = F.relu(x)   
+#         #x,edge_index,edge_weight特征矩阵，邻接矩阵，权重矩阵组成GCN核心公式
+#         x = F.dropout(x, training=self.training)   #用dropout函数防止过拟合
+#         x = self.conv2(x, edge_index, edge_weight)  #输出
+#         print(x)
+#         return x
+#         #x为节点的embedding
 
  
     
-# 5.3) 训练 & 测试.
+# # 5.3) 训练 & 测试.
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = Net().to(device)
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# model = Net().to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+# optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 
-# 训练模型
-def train():
-    model.train()#设置成train模式
-    optimizer.zero_grad()#清空所有被优化的变量的梯度
-    F.nll_loss(model()[data.train_mask], data.y[data.train_mask]).backward() #损失函数训练参数用于节点分类
-    optimizer.step()#步长
+# # 训练模型
+# def train():
+#     model.train()#设置成train模式
+#     optimizer.zero_grad()#清空所有被优化的变量的梯度
+#     F.nll_loss(model()[data.train_mask], data.y[data.train_mask]).backward() #损失函数训练参数用于节点分类
+#     optimizer.step()#步长
      
-@torch.no_grad()#不需要计算梯度，也不进行反向传播
+# @torch.no_grad()#不需要计算梯度，也不进行反向传播
 
 
-# for epoch in range(200):
-#     loss_all = 0
-#     for data in loader:
-#         data = data.to(device)
-#         optimizer.zero_grad()
-#         out = model(data)
-# #         print(output.shape)
-#         loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
-#         loss.backward()
-#         loss_all += loss.item()
-#         optimizer.step()
-#     if epoch % 50 == 0:
-#         print(loss_all)
+# # for epoch in range(200):
+# #     loss_all = 0
+# #     for data in loader:
+# #         data = data.to(device)
+# #         optimizer.zero_grad()
+# #         out = model(data)
+# # #         print(output.shape)
+# #         loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
+# #         loss.backward()
+# #         loss_all += loss.item()
+# #         optimizer.step()
+# #     if epoch % 50 == 0:
+# #         print(loss_all)
 
-def main():
-    train()
-main()
+# def main():
+#     train()
+# main()
 
 
-##2023/4/23
+# ##2023/4/23
+
+#定义编码器
+
+class GCNEncoder(torch.nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(GCNEncoder, self).__init__()
+        # in_channels 是特征数量, out_channels * 2 是因为我们有两个GCNConv, 最后我们得到embedding大小的向量
+        # cached 因为我们只有一张图
+        self.conv1 = GCNConv(in_channels, 2 * out_channels, cached=True) # cached only for transductive learning
+        self.conv2 = GCNConv(2 * out_channels, out_channels, cached=True) # cached only for transductive learning
+        
+    def forward(self, x, edge_index):
+        x = self.conv1(x, edge_index).relu()
+        
+        return self.conv2(x, edge_index)
+    
+#定义自动编码器
+# parameters
+
+out_channels = 2
+num_features = dataset.num_features
+epochs = 100
+
+# model
+model = GAE(GCNEncoder(num_features, out_channels))
+print(model)
+
+# move to GPU (if available)
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model = model.to(device)
+print(type(data))
+print(data)
+x = data.x.to(device)
+train_pos_edge_index = data.train_pos_edge_index.to(device)
+
+# inizialize the optimizer
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+
+#定义训练和测试函数:
+
+def train():
+    model.train()
+    optimizer.zero_grad()
+    # model.encode 调用了我们传入的编码器
+    z = model.encode(x, train_pos_edge_index)
+    # recon_loss 为重构损失
+    loss = model.recon_loss(z, train_pos_edge_index)
+    #if args.variational:
+    #   loss = loss + (1 / data.num_nodes) * model.kl_loss()
+    loss.backward()
+    optimizer.step()
+    return float(loss)
+
+
+def test(pos_edge_index, neg_edge_index):
+    model.eval()
+    with torch.no_grad():
+        z = model.encode(x, train_pos_edge_index)
+    # 使用正边和负边来测试模型的准确率
+    return model.test(z, pos_edge_index, neg_edge_index)
+
+for epoch in range(1, epochs + 1):
+    loss = train()
+
+    # auc 指的是ROC曲线下的面积, ap 指的是平均准确度
+    auc, ap = test(data.test_pos_edge_index, data.test_neg_edge_index)
+    print('Epoch: {:03d}, AUC: {:.4f}, AP: {:.4f}'.format(epoch, auc, ap))
+
+# 我们可以查看模型的图嵌入
+Z = model.encode(x, train_pos_edge_index)
+print("\n", Z)
+
+# #Tensorboard来可视化训练过程:
+
+# # 重新初始化
+# # parameters
+# out_channels = 2
+# num_features = dataset.num_features
+# epochs = 100
+
+# # model
+# model = GAE(GCNEncoder(num_features, out_channels))
+
+# # move to GPU (if available)
+# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# model = model.to(device)
+# x = data.x.to(device)
+# train_pos_edge_index = data.train_pos_edge_index.to(device)
+
+# # inizialize the optimizer
+# optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+
+# writer = SummaryWriter('runs/GAE1_experiment_'+'2d_100_epochs')
+
+# for epoch in range(1, epochs + 1):
+#     loss = train()
+#     auc, ap = test(data.test_pos_edge_index, data.test_neg_edge_index)
+#     print('Epoch: {:03d}, AUC: {:.4f}, AP: {:.4f}'.format(epoch, auc, ap))
+    
+    
+#     writer.add_scalar('auc train',auc,epoch) # new line
+#     writer.add_scalar('ap train',ap,epoch)   # new line
 
