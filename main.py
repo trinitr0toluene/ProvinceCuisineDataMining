@@ -18,8 +18,8 @@ import os.path as osp
 from torch_geometric.data import InMemoryDataset, download_url
 
 
-edge_filepath = 'data/edge_features.xlsx'
-node_filepath = 'data/node_features.xlsx'
+edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/edge_features.xlsx'
+node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/node_features.xlsx'
 k = 15
 
 #initialize
@@ -40,12 +40,12 @@ def excel2edge():
     
     # print(df.columns.values)
     # print(df.index)
-    print(df.shape)
+    # print(df.shape)
     rows = df.shape[0]
     columns = df.shape[1]
 
-    print(rows)
-    print(columns)
+    # print(rows)
+    # print(columns)
     
 
     # for columns
@@ -58,13 +58,16 @@ def excel2edge():
             if(isTopK(data, data_list)):
                 start.append(j)
                 end.append(i)
+                global edge_attr
                 edge_attr.append(data)
-                print(str(j) + ',' + str(i) + ',' + str(data))
+                # print(str(j) + ',' + str(i) + ',' + str(data))
             
             else:
                 # print('第'+j+'行'+i+'列的数据为'+data+',非Top'+k+',故舍弃该边')
-                print(str(df.columns.values[i]) + '到' + str(df.columns.values[j]) + '人口流动数据为' + str(data) + ',非top' + str(k) + ',舍弃该边')
+                # print(str(df.columns.values[i]) + '到' + str(df.columns.values[j]) + '人口流动数据为' + str(data) + ',非top' + str(k) + ',舍弃该边')
                 continue
+    
+    global edge_index
     
     edge_index.append(start)
     edge_index.append(end)
@@ -75,7 +78,7 @@ def excel2edge():
 
 
 def excel2node():
-    df = pd.read_excel(f'{node_filepath}', engine='openpyxl', sheet_name='2022')  
+    df = pd.read_excel(f'{node_filepath}', engine='openpyxl', sheet_name=0)  
 
     print(df.shape)
     rows = df.shape[0]
@@ -86,9 +89,11 @@ def excel2node():
 
     df_new = df.drop(df.columns[[0,1]], axis=1)
     print(df_new.shape)
+    global node_feature
     node_feature = torch.tensor(df_new.values, dtype=torch.float)
 
     # print(node_feature)
+    print(node_feature.size())
 
     return node_feature
 
@@ -163,12 +168,12 @@ class MyOwnDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-dataset = MyOwnDataset()
+dataset = MyOwnDataset(root='data/')
 
-print(dataset.num_classes) # 3
-print(dataset[0].num_nodes) # 19717
-print(dataset[0].num_edges) # 88648
-print(dataset[0].num_features) # 500
+print(dataset.num_classes) # 0
+print(dataset[0].num_nodes) # 31
+print(dataset[0].num_edges) # 465
+print(dataset[0].num_features) # 8
 
 data_list = [dataset[0]]
 data = dataset[0]
@@ -191,6 +196,7 @@ class Net(torch.nn.Module):
         #x,edge_index,edge_weight特征矩阵，邻接矩阵，权重矩阵组成GCN核心公式
         x = F.dropout(x, training=self.training)   #用dropout函数防止过拟合
         x = self.conv2(x, edge_index, edge_weight)  #输出
+        print(x)
         return x
         #x为节点的embedding
 
@@ -228,7 +234,9 @@ def train():
 #         print(loss_all)
 
 def main():
-    print("hello world")
+    train()
 main()
 
+
+##2023/4/23
 
