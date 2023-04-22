@@ -11,7 +11,6 @@ import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
 from torch_geometric.data import InMemoryDataset
-from torch_geometric.utils import train_test_split_edges
 import scipy.sparse as sp
 from models import cluster, GCNClusterNet, GCN
 # from torch.utils.tensorboard import SummaryWriter
@@ -21,6 +20,7 @@ edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/edge_featur
 node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/node_features.xlsx'
 k = 15
 
+K = 8
 #initialize
 edge_index = []
 start = []
@@ -352,6 +352,14 @@ test_object = make_modularity_matrix(bin_adj_all)
 model_cluster.train()
 num_cluster_iter = 1
 losses = []
+
+
+model_cluster = GCNClusterNet(nfeat=data.x.size(1), nhid=50, nout=50, dropout=0.2, K=K, cluster_temp=50)
+optimizer = torch.optim.Adam(model_cluster.parameters(), lr=0.01, weight_decay=5e-4)
+
+model_cluster.train()
+
+
 for epoch in range(1001):
     mu, r, embeds, dist = model_cluster(features, adj, num_cluster_iter)
     loss = loss_modularity(r, bin_adj_all, test_object)
@@ -362,6 +370,9 @@ for epoch in range(1001):
         num_cluster_iter = 5
     if epoch % 100 == 0:
         r = torch.softmax(100 * r, dim=1)
+        if epoch ==1000:
+            print(f"前10行训练得到分配矩阵{r[0:10,0:K]}")
+
     loss_test = loss_modularity(r, bin_adj_all, test_object)
     if epoch == 0:
         best_train_val = 100
@@ -375,6 +386,8 @@ for epoch in range(1001):
             x_best = 5 * x_best / x_best.sum()
     losses.append(loss.item())
     optimizer.step()
+
+
 print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
 
 
