@@ -191,6 +191,7 @@ print(type(data))
 data = train_test_split_edges(data)
 print(data)
 print(type(data))
+print(data.x)
 # loader = DataLoader(data_list, batch_size=1)
 
 # #  定义2层GCN的网络.
@@ -289,6 +290,9 @@ train_pos_edge_index = data.train_pos_edge_index.to(device)
 
 # inizialize the optimizer
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+print(x)
+print(x.size())
+
 
 #定义训练和测试函数:
 
@@ -323,6 +327,9 @@ for epoch in range(1, epochs + 1):
 # 我们可以查看模型的图嵌入
 Z = model.encode(x, train_pos_edge_index)
 print("\n", Z)
+print(Z.size())
+print(x.size())
+print(x)
 
 # #Tensorboard来可视化训练过程:
 
