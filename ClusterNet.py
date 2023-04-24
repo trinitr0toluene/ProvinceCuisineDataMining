@@ -20,7 +20,7 @@ edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/edge_featur
 node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/node_features.xlsx'
 k = 15
 
-K = 8
+K = 5
 #initialize
 edge_index = []
 start = []
@@ -346,7 +346,7 @@ def loss_modularity(r, bin_adj, mod):
 
 
 
-model_cluster = GCNClusterNet(nfeat=8, nhid=50, nout=50, dropout=0.2, K=5, cluster_temp=50)
+model_cluster = GCNClusterNet(nfeat=8, nhid=50, nout=50, dropout=0.2, K=K, cluster_temp=50)
 optimizer = torch.optim.Adam(model_cluster.parameters(), lr=0.01, weight_decay=5e-4)
 test_object = make_modularity_matrix(bin_adj_all)
 model_cluster.train()
@@ -359,9 +359,24 @@ optimizer = torch.optim.Adam(model_cluster.parameters(), lr=0.01, weight_decay=5
 
 model_cluster.train()
 
+'''
+    torch.Size([31, 50])
+    tensor([[ 0.1287,  0.1506,  0.0398,  ..., -0.0872, -0.0940,  0.0876],
+        [ 0.1315,  0.1490,  0.0389,  ..., -0.0874, -0.0979,  0.0880],
+        [ 0.1303,  0.1499,  0.0411,  ..., -0.0853, -0.0955,  0.0878],
+        ...,
+        [ 0.1330,  0.1531,  0.0369,  ..., -0.0863, -0.0991,  0.0893],
+        [ 0.1325,  0.1513,  0.0369,  ..., -0.0847, -0.0952,  0.0905],
+        [ 0.1305,  0.1516,  0.0384,  ..., -0.0873, -0.0952,  0.0897]],
+       grad_fn=<AddBackward0>)
+    '''
 
 for epoch in range(1001):
     mu, r, embeds, dist = model_cluster(features, adj, num_cluster_iter)
+    print(embeds.size())
+    print(embeds)
+    
+    
     loss = loss_modularity(r, bin_adj_all, test_object)
     loss = -loss
     optimizer.zero_grad()
@@ -389,5 +404,7 @@ for epoch in range(1001):
 
 
 print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
+
+
 
 
