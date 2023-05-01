@@ -13,12 +13,16 @@ from torch_geometric.nn import GCNConv
 from torch_geometric.data import InMemoryDataset
 import scipy.sparse as sp
 from models import cluster, GCNClusterNet, GCN
+from torch_geometric.utils import to_networkx
+
+
 # from torch.utils.tensorboard import SummaryWriter
 
 
-edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/edge_features.xlsx'
-node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/data/node_features.xlsx'
-k = 15
+edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/edge_features.xlsx'
+node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_features.xlsx'
+label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class.xlsx'
+k = 5
 
 K = 5
 #initialize
@@ -28,10 +32,9 @@ end = []
 
 edge_attr = []
 node_feature = []
-label=torch.rand(31)
-y = label
+# label=torch.rand(31)
+label = []
 
-print(label)
 def excel2edge(): 
     # open the edge features file and transform it into PyG version
     # param: filename
@@ -82,6 +85,7 @@ def excel2edge():
 def excel2node():
     df = pd.read_excel(f'{node_filepath}', engine='openpyxl', sheet_name=0)  
 
+    
     print(df.shape)
     rows = df.shape[0]
     columns = df.shape[1]
@@ -90,6 +94,7 @@ def excel2node():
     print(columns)
 
     df_new = df.drop(df.columns[[0,1]], axis=1)
+    
     print(df_new.shape)
     global node_feature
     node_feature = torch.tensor(df_new.values, dtype=torch.float)
@@ -111,6 +116,18 @@ def isTopK(data, data_list):
     else:
         return False
 
+
+def addClass():
+    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=0)
+    df_new = df.drop(df.columns[[0,1]], axis=1)
+    df_new['max_idx'] = df_new.idxmax(axis=1)
+    print(df_new['max_idx'])
+    global label
+    label = torch.tensor(df_new['max_idx'], dtype=torch.int)
+    
+    print(label)
+    print(label.size())
+    return label
 
 # build the PyG Dataset
 
@@ -152,11 +169,12 @@ class MyOwnDataset(InMemoryDataset):
         # Read data into huge `Data` list.
         node_feature=excel2node()
         edge_index, edge_attr=excel2edge()
-        global y
+        label = addClass()
+        
         data = Data(x=node_feature, 
                     edge_index=edge_index, 
                     edge_attr=edge_attr, 
-                    y=y)
+                    y=label)
         print(label)
         print(data.y)
         data_list = [data]
@@ -171,7 +189,7 @@ class MyOwnDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-dataset = MyOwnDataset(root='data/')
+dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/')
 
 print(dataset.num_classes) # 0
 print(dataset[0].num_nodes) # 31
@@ -371,7 +389,7 @@ model_cluster.train()
        grad_fn=<AddBackward0>)
     '''
 
-for epoch in range(1001):
+for epoch in range(1):
     mu, r, embeds, dist = model_cluster(features, adj, num_cluster_iter)
     print(embeds.size())
     print(embeds)
@@ -406,5 +424,9 @@ for epoch in range(1001):
 print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
 
 
+# visualize 
+# G = to_networkx(data, to_undirected=True)
+# visualize_graph(G, color=data.y)
 
+## no test stage
 
