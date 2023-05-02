@@ -13,7 +13,7 @@ from torch_geometric.nn import GCNConv
 from torch_geometric.data import InMemoryDataset
 import scipy.sparse as sp
 from models import cluster, GCNClusterNet, GCN
-from torch_geometric.utils import to_networkx
+from sklearn.manifold import TSNE
 
 
 # from torch.utils.tensorboard import SummaryWriter
@@ -22,9 +22,9 @@ from torch_geometric.utils import to_networkx
 edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/edge_features.xlsx'
 node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_features.xlsx'
 label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class.xlsx'
-k = 5
+k = 3
 
-K = 5
+K = 3
 #initialize
 edge_index = []
 start = []
@@ -86,21 +86,21 @@ def excel2node():
     df = pd.read_excel(f'{node_filepath}', engine='openpyxl', sheet_name=0)  
 
     
-    print(df.shape)
+    # print(df.shape)
     rows = df.shape[0]
     columns = df.shape[1]
 
-    print(rows)
-    print(columns)
+    # print(rows)
+    # print(columns)
 
     df_new = df.drop(df.columns[[0,1]], axis=1)
     
-    print(df_new.shape)
+    # print(df_new.shape)
     global node_feature
     node_feature = torch.tensor(df_new.values, dtype=torch.float)
 
     # print(node_feature)
-    print(node_feature.size())
+    # print(node_feature.size())
 
     return node_feature
 
@@ -121,12 +121,12 @@ def addClass():
     df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=0)
     df_new = df.drop(df.columns[[0,1]], axis=1)
     df_new['max_idx'] = df_new.idxmax(axis=1)
-    print(df_new['max_idx'])
+    # print(df_new['max_idx'])
     global label
     label = torch.tensor(df_new['max_idx'], dtype=torch.int)
     
-    print(label)
-    print(label.size())
+    # print(label)
+    # print(label.size())
     return label
 
 # build the PyG Dataset
@@ -175,8 +175,8 @@ class MyOwnDataset(InMemoryDataset):
                     edge_index=edge_index, 
                     edge_attr=edge_attr, 
                     y=label)
-        print(label)
-        print(data.y)
+        # print(label)
+        # print(data.y)
         data_list = [data]
         
  
@@ -191,15 +191,15 @@ class MyOwnDataset(InMemoryDataset):
 
 dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/')
 
-print(dataset.num_classes) # 0
-print(dataset[0].num_nodes) # 31
-print(dataset[0].num_edges) # 465
-print(dataset[0].num_features) # 8
+# print(dataset.num_classes) # 0
+# print(dataset[0].num_nodes) # 31
+# print(dataset[0].num_edges) # 465
+# print(dataset[0].num_features) # 8
 
 data_list = [dataset[0]]
 data = dataset[0]
-print(data)
-print(type(data))
+# print(data)
+# print(type(data))
 
 # transform = RandomLinkSplit(is_undirected=True)
 # print(type(data))
@@ -304,32 +304,6 @@ def sparse_mx_to_torch_sparse_tensor(sparse_mx):
     shape = torch.Size(sparse_mx.shape)
     return torch.sparse.FloatTensor(indices, values, shape)
 
-
-features = sp.csr_matrix(data.x, dtype=np.float32)
-print(data.y)
-  # 取特征
-# adj = sp.coo_matrix((np.ones(data.edge_index.shape[1]), (data.edge_index[0, :], 			data.edge_index[1, :])),
-#                     shape=(data.y.shape[0], data.y.shape[0]), dtype=np.float32)
-adj = sp.coo_matrix((np.ones(data.edge_index.shape[1]), (data.edge_index[0, :], 			data.edge_index[1, :])),
-                    shape=(data.y.shape[0], data.y.shape[0]), dtype=np.float32)
-adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
-features = normalize(features)  # 特征归一化
-adj = normalize(adj + sp.eye(adj.shape[0]))  # A+I归一化
-features = torch.FloatTensor(np.array(features.todense()))# 将numpy的数据转换成torch格式
-adj = sparse_mx_to_torch_sparse_tensor(adj)
-adj = adj.coalesce()
-bin_adj_all = (adj.to_dense() > 0).float()
-
-'''
-    The ClusterNet architecture. The first step is a 2-layer GCN to generate embeddings.
-    The output is the cluster means mu and soft assignments r, along with the
-    embeddings and the the node similarities (just output for debugging purposes).
-
-    The forward pass inputs are x, a feature matrix for the nodes, and adj, a sparse
-    adjacency matrix. The optional parameter num_iter determines how many steps to
-    run the k-means updates for.
-    '''
-
 class GCNClusterNet(torch.nn.Module):
     def __init__(self, nfeat, nhid, nout, dropout, K, cluster_temp):
         super(GCNClusterNet, self).__init__()
@@ -363,18 +337,44 @@ def loss_modularity(r, bin_adj, mod):
     return (1. / bin_adj_nodiag.sum()) * (r.t() @ mod @ r).trace()
 
 
+features = sp.csr_matrix(data.x, dtype=np.float32)
+# print(data.y)
+  # 取特征
+# adj = sp.coo_matrix((np.ones(data.edge_index.shape[1]), (data.edge_index[0, :], 			data.edge_index[1, :])),
+#                     shape=(data.y.shape[0], data.y.shape[0]), dtype=np.float32)
+adj = sp.coo_matrix((np.ones(data.edge_index.shape[1]), (data.edge_index[0, :], 			data.edge_index[1, :])),
+                    shape=(data.y.shape[0], data.y.shape[0]), dtype=np.float32)
+adj = adj + adj.T.multiply(adj.T > adj) - adj.multiply(adj.T > adj)
+features = normalize(features)  # 特征归一化
+adj = normalize(adj + sp.eye(adj.shape[0]))  # A+I归一化
+features = torch.FloatTensor(np.array(features.todense()))# 将numpy的数据转换成torch格式
+adj = sparse_mx_to_torch_sparse_tensor(adj)
+adj = adj.coalesce()
+bin_adj_all = (adj.to_dense() > 0).float()
 
-model_cluster = GCNClusterNet(nfeat=8, nhid=50, nout=50, dropout=0.2, K=K, cluster_temp=50)
-optimizer = torch.optim.Adam(model_cluster.parameters(), lr=0.01, weight_decay=5e-4)
+'''
+    The ClusterNet architecture. The first step is a 2-layer GCN to generate embeddings.
+    The output is the cluster means mu and soft assignments r, along with the
+    embeddings and the the node similarities (just output for debugging purposes).
+
+    The forward pass inputs are x, a feature matrix for the nodes, and adj, a sparse
+    adjacency matrix. The optional parameter num_iter determines how many steps to
+    run the k-means updates for.
+    '''
+
+
+
+
+
 test_object = make_modularity_matrix(bin_adj_all)
-model_cluster.train()
+
 num_cluster_iter = 1
 losses = []
 
 
 model_cluster = GCNClusterNet(nfeat=data.x.size(1), nhid=50, nout=50, dropout=0.2, K=K, cluster_temp=50)
 optimizer = torch.optim.Adam(model_cluster.parameters(), lr=0.01, weight_decay=5e-4)
-
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_cluster.train()
 
 '''
@@ -391,9 +391,9 @@ model_cluster.train()
 
 for epoch in range(1):
     mu, r, embeds, dist = model_cluster(features, adj, num_cluster_iter)
-    print(embeds.size())
-    print(embeds)
-    
+    # print(embeds.size())
+    # print(embeds)
+
     
     loss = loss_modularity(r, bin_adj_all, test_object)
     loss = -loss
@@ -405,6 +405,25 @@ for epoch in range(1):
         r = torch.softmax(100 * r, dim=1)
         if epoch ==1000:
             print(f"前10行训练得到分配矩阵{r[0:10,0:K]}")
+            # print(r)
+            # colors = [
+            #  '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+            #  '#ffd700','green']
+            # z = embeds
+            # # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
+            # z = TSNE(n_components=2).fit_transform(z.detach().numpy())
+            # y = data.y.detach().numpy()
+
+            # plt.figure(figsize=(8, 8))
+            
+            # # 绘制不同类别的节点
+            # for i in range(dataset.num_classes):
+            #     # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
+            #     plt.scatter(z[y == i, 0], z[y == i, 1], s=20, color=colors[i])
+            # plt.axis('off')
+            # plt.show()
+            # plt.savefig('./dataset')
+            
 
     loss_test = loss_modularity(r, bin_adj_all, test_object)
     if epoch == 0:
@@ -419,7 +438,25 @@ for epoch in range(1):
             x_best = 5 * x_best / x_best.sum()
     losses.append(loss.item())
     optimizer.step()
+    
+    print(r)
+    colors = [
+            '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+            '#ffd700','green']
+    z = embeds
+    # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
+    z = TSNE(n_components=2).fit_transform(z.detach().numpy())
+    y = data.y.detach().numpy()
 
+    plt.figure(figsize=(8, 8))
+    
+    # 绘制不同类别的节点
+    for i in range(dataset.num_classes):
+        # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
+        plt.scatter(z[y == i, 0], z[y == i, 1], s=20, color=colors[i])
+    plt.axis('off')
+    plt.show()
+    plt.savefig('./dataset')    
 
 print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
 
@@ -428,5 +465,27 @@ print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
 # G = to_networkx(data, to_undirected=True)
 # visualize_graph(G, color=data.y)
 
-## no test stage
+# 可视化节点的embedding
 
+# with torch.no_grad():
+#     # 不同类别节点对应的颜色信息
+#     colors = [
+#             '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+#             '#ffd700'
+#         ]
+
+#     model_cluster.eval() # 开启测试模式
+#     # 获取节点的embedding向量，形状为[num_nodes, embedding_dim]
+#     _, _, z, _ = model_cluster(torch.arange(data.num_nodes, device=device))
+#     # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
+#     z = TSNE(n_components=2).fit_transform(z.detach().numpy())
+#     y = data.y.detach().numpy()
+
+#     plt.figure(figsize=(8, 8))
+    
+#     # 绘制不同类别的节点
+#     for i in range(dataset.num_classes):
+#         # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
+#         plt.scatter(z[y == i, 0], z[y == i, 1], s=20, color=colors[i])
+#     plt.axis('off')
+#     plt.show()
