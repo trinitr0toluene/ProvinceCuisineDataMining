@@ -6,15 +6,17 @@ import torch.distributed as dist
 
 
 class Log():
-    def __init__(self):
+    def __init__(self, time):
         self.logger = None
+        self.__get_logger()
+        self.__add_handler(time)
         
-    def get_logger(self):
+    def __get_logger(self):
         self.logger = logging.getLogger("logger")
         self.logger.setLevel(logging.INFO)
         
 
-    def add_handler(self, time):
+    def __add_handler(self, time):
         # path = os.path.join("Log", time)
         path = os.path.join("Log", time[:10], time[11:])
         if os.path.exists(path) == False:
@@ -27,4 +29,8 @@ class Log():
         fh.setFormatter(formatter)
         self.logger.addHandler(fh)
 
-  
+
+def get_logger(time):
+    log = Log(time)
+    
+    return log.logger

@@ -14,7 +14,7 @@ from torch_geometric.data import InMemoryDataset
 import scipy.sparse as sp
 from models import cluster, GCNClusterNet, GCN
 from sklearn.manifold import TSNE
-from log import Log
+from log import get_logger
 import datetime
 # from pylab import mpl
  
@@ -398,10 +398,10 @@ def draw(z,r):
 
 
 start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-log_main = Log()
-log_main.get_logger()
-log_main.add_handler(start_time)
-log_main.logger.info("Begin")
+logger = get_logger(start_time)
+# logger.get_logger()
+# logger.add_handler(start_time)
+logger.info("Begin")
 
 features = sp.csr_matrix(data.x, dtype=np.float32)
 # print(data.y)
@@ -510,49 +510,11 @@ for epoch in range(iter_num):
     optimizer.step()
     
     if epoch == iter_num-1:
-        log_main.logger.info(r)
+        logger.info(r)
         draw(embeds, r)
-        # colors = [
-        #         '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
-        #         '#ffd700','green']
-        # z = embeds
-        # # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
-        # z = TSNE(n_components=2).fit_transform(z.detach().numpy())
-        # getProvince()
-        # # z = np.c_[z,province_list]
-        
-        # # z.append(province_list)
-        # # print(z)
-        # y = data.y.detach().numpy()
-        # r = r.detach().numpy()
-        # result = np.argmax(r, axis=1)
-        
-        # plt.figure(figsize=(8, 8))
-        
-        
-        # for j in range(K):
-        #     plt.scatter(z[result == j,0], z[result == j,1],s=450, color=colors[j], alpha=0.5)
-        # for i in range(z.shape[0]):  ## for every node
-        #     plt.annotate(province_list[i], xy = (z[i,0],z[i,1]),  xytext=(-20, 10), textcoords = 'offset points',ha = 'center', va = 'top')    
+ 
 
-        # # for i in range(z.shape[0]):  ## for every node
-        # #     for j in range(K):
-        # #         plt.scatter(z[i,0], z[i,1],s=450, color=colors[j], alpha=0.5)
-        # #         print(z[i,0])
-        # #         print(z[i,1])
-        # #         plt.annotate(province_list[i], xy = (z[i,0],z[i,1]), textcoords = 'offset points',ha = 'center', va = 'top')
-
-        # # 绘制不同类别的节点
-        # # for i in range(dataset.num_classes):
-        # #     # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
-        # #     plt.scatter(z[y == i, 0], z[y == i, 1], s=450, color=colors[i], alpha=0.5)
-            
-        #     # plt.annotate(z[2,] xy = (x,y), textcoords = 'offset points',ha = 'center', va = 'top')
-        # plt.axis('off')
-        # plt.show()
-        # plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/result'+start_time)    
-
-    log_main.logger.info(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
+    logger.info(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
     print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
     if curr_test_loss > best_test_loss:
         best_test_loss = curr_test_loss
@@ -561,7 +523,7 @@ for epoch in range(iter_num):
         es += 1
         if es == 200:
             print('Early Stop!')
-            log_main.logger.info('Early Stop!')
+            logger.info('Early Stop!')
             draw(embeds, r)
             break
 
