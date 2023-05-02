@@ -14,6 +14,13 @@ from torch_geometric.data import InMemoryDataset
 import scipy.sparse as sp
 from models import cluster, GCNClusterNet, GCN
 from sklearn.manifold import TSNE
+# from pylab import mpl
+ 
+# # 设置中文显示字体
+# mpl.rcParams["font.sans-serif"] = ["Noto Mono"]
+# # 设置正常显示符号
+# mpl.rcParams["axes.unicode_minus"] = False
+
 
 
 # from torch.utils.tensorboard import SummaryWriter
@@ -34,6 +41,7 @@ edge_attr = []
 node_feature = []
 # label=torch.rand(31)
 label = []
+province_list = []
 
 def excel2edge(): 
     # open the edge features file and transform it into PyG version
@@ -123,12 +131,21 @@ def addClass():
     df_new['max_idx'] = df_new.idxmax(axis=1)
     # print(df_new['max_idx'])
     global label
+    
     label = torch.tensor(df_new['max_idx'], dtype=torch.int)
+     
     
     # print(label)
     # print(label.size())
     return label
 
+
+def getProvince():
+    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=0)
+    global province_list
+    province_list = df.values[: , 0]
+    return province_list
+   
 # build the PyG Dataset
 
 
@@ -389,7 +406,8 @@ model_cluster.train()
        grad_fn=<AddBackward0>)
     '''
 
-for epoch in range(1):
+iter_num = 10001
+for epoch in range(iter_num):
     mu, r, embeds, dist = model_cluster(features, adj, num_cluster_iter)
     # print(embeds.size())
     # print(embeds)
@@ -403,8 +421,8 @@ for epoch in range(1):
         num_cluster_iter = 5
     if epoch % 100 == 0:
         r = torch.softmax(100 * r, dim=1)
-        if epoch ==1000:
-            print(f"前10行训练得到分配矩阵{r[0:10,0:K]}")
+        # if epoch ==1000:
+        #     print(f"前10行训练得到分配矩阵{r[0:10,0:K]}")
             # print(r)
             # colors = [
             #  '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
@@ -439,26 +457,49 @@ for epoch in range(1):
     losses.append(loss.item())
     optimizer.step()
     
-    print(r)
-    colors = [
-            '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
-            '#ffd700','green']
-    z = embeds
-    # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
-    z = TSNE(n_components=2).fit_transform(z.detach().numpy())
-    y = data.y.detach().numpy()
+    if epoch == iter_num-1:
+        print(r)
+        colors = [
+                '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+                '#ffd700','green']
+        z = embeds
+        # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
+        z = TSNE(n_components=2).fit_transform(z.detach().numpy())
+        getProvince()
+        # z = np.c_[z,province_list]
+        
+        # z.append(province_list)
+        # print(z)
+        y = data.y.detach().numpy()
+        r = r.detach().numpy()
+        result = np.argmax(r, axis=1)
+        
+        plt.figure(figsize=(8, 8))
+        
+        
+        for j in range(K):
+            plt.scatter(z[result == j,0], z[result == j,1],s=450, color=colors[j], alpha=0.5)
+        for i in range(z.shape[0]):  ## for every node
+            plt.annotate(province_list[i], xy = (z[i,0],z[i,1]),  xytext=(-20, 10), textcoords = 'offset points',ha = 'center', va = 'top')    
 
-    plt.figure(figsize=(8, 8))
-    
-    # 绘制不同类别的节点
-    for i in range(dataset.num_classes):
-        # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
-        plt.scatter(z[y == i, 0], z[y == i, 1], s=20, color=colors[i])
-    plt.axis('off')
-    plt.show()
-    plt.savefig('./dataset')    
+        # for i in range(z.shape[0]):  ## for every node
+        #     for j in range(K):
+        #         plt.scatter(z[i,0], z[i,1],s=450, color=colors[j], alpha=0.5)
+        #         print(z[i,0])
+        #         print(z[i,1])
+        #         plt.annotate(province_list[i], xy = (z[i,0],z[i,1]), textcoords = 'offset points',ha = 'center', va = 'top')
 
-print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
+        # 绘制不同类别的节点
+        # for i in range(dataset.num_classes):
+        #     # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
+        #     plt.scatter(z[y == i, 0], z[y == i, 1], s=450, color=colors[i], alpha=0.5)
+            
+            # plt.annotate(z[2,] xy = (x,y), textcoords = 'offset points',ha = 'center', va = 'top')
+        plt.axis('off')
+        plt.show()
+        plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/result')    
+
+    print(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
 
 
 # visualize 
