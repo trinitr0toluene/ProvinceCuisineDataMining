@@ -88,7 +88,8 @@ def excel2edge():
     edge_index.append(end)
     edge_index = torch.LongTensor(edge_index)
     edge_attr = torch.tensor(edge_attr)
-
+    print(edge_attr.size())
+    print(edge_index.size())
     return edge_index, edge_attr
 
 
