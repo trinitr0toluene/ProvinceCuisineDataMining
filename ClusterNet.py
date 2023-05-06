@@ -213,7 +213,7 @@ dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/data
 
 # print(dataset.num_classes) # 0
 # print(dataset[0].num_nodes) # 31
-# print(dataset[0].num_edges) # 465
+# print(dataset[0].num_edges) # 93
 # print(dataset[0].num_features) # 8
 
 data_list = [dataset[0]]
