@@ -14,6 +14,8 @@ from torch_geometric.data import DataLoader
 from torch_geometric.data import InMemoryDataset
 from log import get_logger
 import datetime
+from torch_geometric.utils.convert import to_networkx
+
 
 # from torch.utils.tensorboard import SummaryWriter
 
@@ -22,6 +24,8 @@ edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/edge_fea
 node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_features.xlsx'
 label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class.xlsx'
 k = 3
+
+K = 3
 
 #initialize
 edge_index = []
@@ -221,6 +225,82 @@ data = dataset[0]
 print(data)
 print(type(data))
 
+G = to_networkx(data)
+
+def get_dis(data, center, k):
+    ret = []
+    print(len(data))
+    for point in data:
+        # np.tile(a, (2, 1))就是把a先沿x轴复制1倍，即没有复制，仍然是[0, 1, 2]。 再把结果沿y方向复制2倍得到array([[0, 1, 2], [0, 1, 2]])
+        # k个中心点，所以有k行
+        diff = np.tile(point, (k, 1)) - center
+        squaredDiff = diff ** 2  # 平方
+        squaredDist = np.sum(squaredDiff, axis=1)  # 和  (axis=1表示行)
+        print(f"sq: {squaredDist}")
+        
+        distance = squaredDist ** 0.5  # 开根号
+        ret.append(distance)
+    print(f"get_dis: {np.array(ret)}")
+    print(len(ret))    
+    return np.array(ret)
+
+def k_means(m, K):
+    """
+    :param m: GCN的训练结果
+    :param K: 类别数
+    :return: 聚类结果
+    """
+    print(m)
+    nodes = list(G.nodes)
+    # 任意选择K个节点作为初始聚类中心
+    centers = []
+    temp = []
+    for i in range(K):
+        t = np.random.randint(0, len(nodes) - 1)
+        print(nodes[t])
+        print(m[nodes[t]])
+        print(centers)
+        # if m[nodes[t]] not in centers:
+        if nodes[t] not in temp:
+            temp.append(nodes[t])
+            centers.append(m[nodes[t]])  # 中心为8维向量
+
+    # 迭代50次
+    res = {}
+    for i in range(K):
+        res[i] = []
+
+    for time in range(50):
+        # clear
+        for i in range(K):
+            res[i].clear()
+        # 算出每个点的向量到聚类中心的距离
+        nodes_distance = {}
+        for node in nodes:
+            # node到中心节点的距离
+            node_distance = []
+            for center in centers:
+                node_distance.append(get_dis(m.detach().cpu(), center.detach().cpu().numpy(),K))
+            nodes_distance[node] = node_distance  # 保存node节点到各个中心的距离
+        # 对每个节点重新划分类别，选择一个最近的节点进行分类，类别为0-5
+        for node in nodes:
+            temp = nodes_distance[node]  # 存放着3个距离
+
+            print(temp)
+            print(min(temp))
+            cls = temp.index(min(temp))
+            res[cls].append(node)
+
+        # 更新聚类中心
+        centers.clear()
+        for i in range(K):
+            center = []
+            for j in range(128):
+                t = [m[node][j] for node in res[i]]  # 第i个类别中所有node节点的第j个坐标
+                center.append(np.mean(t))
+            centers.append(center)
+
+    return res
 # transform = RandomLinkSplit(is_undirected=True)
 # print(type(data))
 # data = transform(data)
@@ -249,7 +329,9 @@ class Net(torch.nn.Module):
         x = F.dropout(x, training=self.training)   #用dropout函数防止过拟合
         x = self.conv2(x, edge_index, edge_weight)  #输出
         # print(x)
-        return F.log_softmax(x, dim=-1)    #若不对输出数据做归一化处理，则loss为负值
+        x = F.log_softmax(x, dim=-1) 
+        print(x)
+        return x   #若不对输出数据做归一化处理，则loss为负值(二维张量：dim=1和dim=-1结果相同)
         #x为节点的embedding
 
  
@@ -264,10 +346,12 @@ model = Net().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 # @torch.no_grad()   #不需要计算梯度，也不进行反向传播
 
-    
-for epoch in range(200):
+iter_num = 200   
+for epoch in range(iter_num):
     optimizer.zero_grad()#清空所有被优化的变量的梯度
     model.train()#设置成train模式
+    out = model()
+    print('out:',out)
     label = data.y
     # one_hot = F.one_hot(label, num_classes = dataset.num_classes)
     # print(one_hot)
@@ -279,6 +363,10 @@ for epoch in range(200):
      
     
     print(f'epoch{epoch + 1}   loss:{loss}')
+    if epoch == iter_num-1:
+        result = k_means(out, K)
+        
+        print(result)
     
 
 
@@ -296,4 +384,15 @@ for epoch in range(200):
 # nx.draw_networkx(g , ax = ax1 , font_size=6 , node_size = 150)
 # plt.show()
 
+# graph = nx.Graph()
+# edge_index = data.edge_index.T
 
+# for i in range(edge_index.shape[0]):
+#     graph.add_edge(edge_index[i][0].item(), edge_index[i][1].item())
+
+# pos = nx.kamada_kawai_layout(graph)
+
+
+
+# if __name__=='__main__':
+#     K_means()
