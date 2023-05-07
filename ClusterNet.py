@@ -230,65 +230,7 @@ data = dataset[0]
 # print(data.x)
 # loader = DataLoader(data_list, batch_size=1)
 
-# #  定义2层GCN的网络.
-# class Net(torch.nn.Module):
-#     def __init__(self):
-#         super(Net, self).__init__()
-#         self.conv1 = GCNConv(dataset.num_node_features, 16)
-#         self.conv2 = GCNConv(16, dataset.num_classes)
-    
-    
-#     def forward(self):
-#         x, edge_index, edge_weight = data.x, data.edge_index, data.edge_attr  #赋值data.x特征向量edge_index图的形状，edge_attr权重矩阵
 
-#         x = self.conv1(x, edge_index, edge_weight)
-#         x = F.relu(x)   
-#         #x,edge_index,edge_weight特征矩阵，邻接矩阵，权重矩阵组成GCN核心公式
-#         x = F.dropout(x, training=self.training)   #用dropout函数防止过拟合
-#         x = self.conv2(x, edge_index, edge_weight)  #输出
-#         print(x)
-#         return x
-#         #x为节点的embedding
-
- 
-    
-# # 5.3) 训练 & 测试.
-
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# model = Net().to(device)
-
-# optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-
-# # 训练模型
-# def train():
-#     model.train()#设置成train模式
-#     optimizer.zero_grad()#清空所有被优化的变量的梯度
-#     F.nll_loss(model()[data.train_mask], data.y[data.train_mask]).backward() #损失函数训练参数用于节点分类
-#     optimizer.step()#步长
-     
-# @torch.no_grad()#不需要计算梯度，也不进行反向传播
-
-
-# # for epoch in range(200):
-# #     loss_all = 0
-# #     for data in loader:
-# #         data = data.to(device)
-# #         optimizer.zero_grad()
-# #         out = model(data)
-# # #         print(output.shape)
-# #         loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask])
-# #         loss.backward()
-# #         loss_all += loss.item()
-# #         optimizer.step()
-# #     if epoch % 50 == 0:
-# #         print(loss_all)
-
-# def main():
-#     train()
-# main()
-
-
-# ##2023/4/23
 
 class GCN_NET(torch.nn.Module):
     def __init__(self, nhid, nout, dropout):
@@ -530,31 +472,3 @@ for epoch in range(iter_num):
 
 
 
-# visualize 
-# G = to_networkx(data, to_undirected=True)
-# visualize_graph(G, color=data.y)
-
-# 可视化节点的embedding
-
-# with torch.no_grad():
-#     # 不同类别节点对应的颜色信息
-#     colors = [
-#             '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
-#             '#ffd700'
-#         ]
-
-#     model_cluster.eval() # 开启测试模式
-#     # 获取节点的embedding向量，形状为[num_nodes, embedding_dim]
-#     _, _, z, _ = model_cluster(torch.arange(data.num_nodes, device=device))
-#     # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
-#     z = TSNE(n_components=2).fit_transform(z.detach().numpy())
-#     y = data.y.detach().numpy()
-
-#     plt.figure(figsize=(8, 8))
-    
-#     # 绘制不同类别的节点
-#     for i in range(dataset.num_classes):
-#         # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
-#         plt.scatter(z[y == i, 0], z[y == i, 1], s=20, color=colors[i])
-#     plt.axis('off')
-#     plt.show()

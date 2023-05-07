@@ -119,7 +119,7 @@ def addClass():
     # print(df_new['max_idx'])
     global label
     
-    label = torch.tensor(df_new['max_idx'], dtype=torch.int)
+    label = torch.tensor(df_new['max_idx'], dtype=torch.int64)
      
     
     # print(label)
@@ -228,7 +228,7 @@ print(type(data))
 # print(data)
 # print(type(data))
 # print(data.x)
-loader = DataLoader(data_list, batch_size=1)
+# loader = DataLoader(data_list, batch_size=1)
 hidden_dim = 16
 
 #  定义2层GCN的网络.
@@ -239,7 +239,7 @@ class Net(torch.nn.Module):
         self.conv2 = GCNConv(hidden_dim, dataset.num_classes)
     
     
-    def forward(self,data):
+    def forward(self):
         x, edge_index, edge_weight = data.x, torch.tensor(data.edge_index, dtype=torch.int), torch.tensor(data.edge_attr, dtype=torch.float)  #赋值data.x特征向量edge_index图的形状，edge_attr权重矩阵
 
 
@@ -248,7 +248,7 @@ class Net(torch.nn.Module):
         #x,edge_index,edge_weight特征矩阵，邻接矩阵，权重矩阵组成GCN核心公式
         x = F.dropout(x, training=self.training)   #用dropout函数防止过拟合
         x = self.conv2(x, edge_index, edge_weight)  #输出
-        print(x)
+        # print(x)
         return x
         #x为节点的embedding
 
@@ -257,37 +257,51 @@ class Net(torch.nn.Module):
 # 5.3) 训练 & 测试.
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+
+data = data.to(device)
 model = Net().to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
-@torch.no_grad()   #不需要计算梯度，也不进行反向传播
-# 训练模型
-def train():
-    model.train()#设置成train模式
+# @torch.no_grad()   #不需要计算梯度，也不进行反向传播
+
+model.train()
+    
+for epoch in range(200):
     optimizer.zero_grad()#清空所有被优化的变量的梯度
-    F.nll_loss(model()[data.train_mask], data.y[data.train_mask]).backward() #损失函数训练参数用于节点分类
+    model.train()#设置成train模式
+    label = data.y
+    # one_hot = F.one_hot(label, num_classes = dataset.num_classes)
+    # print(one_hot)
+    loss = F.nll_loss(model()[data.train_mask], label[data.train_mask])
+    loss.requires_grad_(True)
+    loss.backward()
+     #损失函数训练参数用于节点分类
     optimizer.step()#步长
      
+    
+    print(f'epoch{epoch + 1}   loss:{loss}')
+    
+    
 
 
 
-for epoch in range(200):
-    loss_all = 0
-    for data in loader:
-        data = data.to(device)
-        optimizer.zero_grad()
-        out = model(data)
-#         print(output.shape)
-        loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask].long())
-        loss.backward()
-        loss_all += loss.item()
-        optimizer.step()
-    if epoch % 50 == 0:
-        print(loss_all)
+# for epoch in range(200):
+#     loss_all = 0
+#     for data in loader:
+#         data = data.to(device)
+#         optimizer.zero_grad()
+#         out = model(data)
+# #         print(output.shape)
+#         loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask].long())
+#         loss.backward()
+#         loss_all += loss.item()
+#         optimizer.step()
+#     if epoch % 50 == 0:
+#         print(loss_all)
 
-def main():
-    train()
-main()
+# def main():
+#     train()
+# main()
 
 
 # Visulization module
