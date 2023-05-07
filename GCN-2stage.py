@@ -249,7 +249,7 @@ class Net(torch.nn.Module):
         x = F.dropout(x, training=self.training)   #用dropout函数防止过拟合
         x = self.conv2(x, edge_index, edge_weight)  #输出
         # print(x)
-        return x
+        return F.log_softmax(x, dim=-1)    #若不对输出数据做归一化处理，则loss为负值
         #x为节点的embedding
 
  
@@ -264,7 +264,6 @@ model = Net().to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
 # @torch.no_grad()   #不需要计算梯度，也不进行反向传播
 
-model.train()
     
 for epoch in range(200):
     optimizer.zero_grad()#清空所有被优化的变量的梯度
@@ -281,27 +280,6 @@ for epoch in range(200):
     
     print(f'epoch{epoch + 1}   loss:{loss}')
     
-    
-
-
-
-# for epoch in range(200):
-#     loss_all = 0
-#     for data in loader:
-#         data = data.to(device)
-#         optimizer.zero_grad()
-#         out = model(data)
-# #         print(output.shape)
-#         loss = F.nll_loss(out[data.train_mask], data.y[data.train_mask].long())
-#         loss.backward()
-#         loss_all += loss.item()
-#         optimizer.step()
-#     if epoch % 50 == 0:
-#         print(loss_all)
-
-# def main():
-#     train()
-# main()
 
 
 # Visulization module
