@@ -227,22 +227,27 @@ print(type(data))
 
 G = to_networkx(data)
 
-def get_dis(data, center, k):
-    ret = []
-    print(len(data))
-    for point in data:
-        # np.tile(a, (2, 1))就是把a先沿x轴复制1倍，即没有复制，仍然是[0, 1, 2]。 再把结果沿y方向复制2倍得到array([[0, 1, 2], [0, 1, 2]])
-        # k个中心点，所以有k行
-        diff = np.tile(point, (k, 1)) - center
-        squaredDiff = diff ** 2  # 平方
-        squaredDist = np.sum(squaredDiff, axis=1)  # 和  (axis=1表示行)
-        print(f"sq: {squaredDist}")
+# def get_dis(data, center):
+#     ret = []
+#     print(len(data))
+#     for point in data:
+#         # np.tile(a, (2, 1))就是把a先沿x轴复制1倍，即没有复制，仍然是[0, 1, 2]。 再把结果沿y方向复制2倍得到array([[0, 1, 2], [0, 1, 2]])
+#         # k个中心点，所以有k行
+#         diff = np.tile(point, (K, 1)) - center
+#         squaredDiff = diff ** 2  # 平方
+#         squaredDist = np.sum(squaredDiff, axis=1)  # 和  (axis=1表示行)
+#         print(f"sq: {squaredDist}")
         
-        distance = squaredDist ** 0.5  # 开根号
-        ret.append(distance)
-    print(f"get_dis: {np.array(ret)}")
-    print(len(ret))    
-    return np.array(ret)
+#         distance = squaredDist ** 0.5  # 开根号
+#         ret.append(distance)
+#     print(f"get_dis: {np.array(ret)}")
+#     print(len(ret))    
+#     return np.array(ret)
+
+def calEuclidean(data, center):
+    dist = np.sqrt(np.sum(np.square(data-center))) 
+    print(type(dist))
+    return dist
 
 def k_means(m, K):
     """
@@ -257,9 +262,9 @@ def k_means(m, K):
     temp = []
     for i in range(K):
         t = np.random.randint(0, len(nodes) - 1)
-        print(nodes[t])
-        print(m[nodes[t]])
-        print(centers)
+        # print(nodes[t])
+        # print(m[nodes[t]])
+        # print(centers)
         # if m[nodes[t]] not in centers:
         if nodes[t] not in temp:
             temp.append(nodes[t])
@@ -280,14 +285,17 @@ def k_means(m, K):
             # node到中心节点的距离
             node_distance = []
             for center in centers:
-                node_distance.append(get_dis(m.detach().cpu(), center.detach().cpu().numpy(),K))
+                print('m[node]:',node, type(m[node]))
+                print('center:', center, type(center))
+                node_distance.append(calEuclidean(m[node], center))  # get_dis函数计算单个节点到单个center的欧式距离
             nodes_distance[node] = node_distance  # 保存node节点到各个中心的距离
         # 对每个节点重新划分类别，选择一个最近的节点进行分类，类别为0-5
+        print(i)
         for node in nodes:
             temp = nodes_distance[node]  # 存放着3个距离
 
-            print(temp)
-            print(min(temp))
+            # print(temp)
+            # print(min(temp))
             cls = temp.index(min(temp))
             res[cls].append(node)
 
@@ -295,10 +303,11 @@ def k_means(m, K):
         centers.clear()
         for i in range(K):
             center = []
-            for j in range(128):
+            for j in range(8):
                 t = [m[node][j] for node in res[i]]  # 第i个类别中所有node节点的第j个坐标
                 center.append(np.mean(t))
             centers.append(center)
+           
 
     return res
 # transform = RandomLinkSplit(is_undirected=True)
@@ -330,7 +339,7 @@ class Net(torch.nn.Module):
         x = self.conv2(x, edge_index, edge_weight)  #输出
         # print(x)
         x = F.log_softmax(x, dim=-1) 
-        print(x)
+        # print(x)
         return x   #若不对输出数据做归一化处理，则loss为负值(二维张量：dim=1和dim=-1结果相同)
         #x为节点的embedding
 
@@ -351,10 +360,11 @@ for epoch in range(iter_num):
     optimizer.zero_grad()#清空所有被优化的变量的梯度
     model.train()#设置成train模式
     out = model()
-    print('out:',out)
+    # print('out:',out)
     label = data.y
     # one_hot = F.one_hot(label, num_classes = dataset.num_classes)
     # print(one_hot)
+
     loss = F.nll_loss(model()[data.train_mask], label[data.train_mask])
     loss.requires_grad_(True)
     loss.backward()
@@ -364,6 +374,7 @@ for epoch in range(iter_num):
     
     print(f'epoch{epoch + 1}   loss:{loss}')
     if epoch == iter_num-1:
+        out = out.detach().cpu().numpy()
         result = k_means(out, K)
         
         print(result)
