@@ -401,7 +401,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 data = data.to(device)
 model = Net().to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
+lr = 0.01
+wd = 5e-4
+optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
+logger.info(f'lr = {lr}  weight_decay:{wd}')
 # @torch.no_grad()   #不需要计算梯度，也不进行反向传播
 
 iter_num = 10001   
@@ -425,8 +428,8 @@ for epoch in range(iter_num):
     if epoch == iter_num-1:
         out = out.detach().cpu().numpy()
         result = k_means(out, K)
-        logger.info('Final Result:',result)
-        print('Final Result:',result)
+        logger.info(f'Final Result:{result}')
+        print(f'Final Result:{result}')
         draw(out,result)
     
 
