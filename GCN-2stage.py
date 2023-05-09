@@ -15,6 +15,8 @@ from torch_geometric.data import InMemoryDataset
 from log import get_logger
 import datetime
 from torch_geometric.utils.convert import to_networkx
+from sklearn.manifold import TSNE
+
 
 
 # from torch.utils.tensorboard import SummaryWriter
@@ -87,20 +89,20 @@ def excel2edge():
 def excel2node():
     df = pd.read_excel(f'{node_filepath}', engine='openpyxl', sheet_name=0)  
 
-    print(df.shape)
+    # print(df.shape)
     rows = df.shape[0]
     columns = df.shape[1]
 
-    print(rows)
-    print(columns)
+    # print(rows)
+    # print(columns)
 
     df_new = df.drop(df.columns[[0,1]], axis=1)
-    print(df_new.shape)
+    # print(df_new.shape)
     global node_feature
     node_feature = torch.tensor(df_new.values, dtype=torch.float)
 
     # print(node_feature)
-    print(node_feature.size())
+    # print(node_feature.size())
 
     return node_feature
 
@@ -215,15 +217,15 @@ class MyOwnDataset(InMemoryDataset):
 
 dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/2stage')
 
-print(dataset.num_classes) # 0
-print(dataset[0].num_nodes) # 31
-print(dataset[0].num_edges) # 93
-print(dataset[0].num_features) # 8
+# print(dataset.num_classes) # 0
+# print(dataset[0].num_nodes) # 31
+# print(dataset[0].num_edges) # 93
+# print(dataset[0].num_features) # 8
 
 data_list = [dataset[0]]
 data = dataset[0]
-print(data)
-print(type(data))
+# print(data)
+# print(type(data))
 
 G = to_networkx(data)
 
@@ -246,7 +248,7 @@ G = to_networkx(data)
 
 def calEuclidean(data, center):
     dist = np.sqrt(np.sum(np.square(data-center))) 
-    print(type(dist))
+    # print(type(dist))
     return dist
 
 def k_means(m, K):
@@ -255,7 +257,7 @@ def k_means(m, K):
     :param K: 类别数
     :return: 聚类结果
     """
-    print(m)
+    # print(m)
     nodes = list(G.nodes)
     # 任意选择K个节点作为初始聚类中心
     centers = []
@@ -285,12 +287,12 @@ def k_means(m, K):
             # node到中心节点的距离
             node_distance = []
             for center in centers:
-                print('m[node]:',node, type(m[node]))
-                print('center:', center, type(center))
+                # print('m[node]:',node, type(m[node]))
+                # print('center:', center, type(center))
                 node_distance.append(calEuclidean(m[node], center))  # get_dis函数计算单个节点到单个center的欧式距离
             nodes_distance[node] = node_distance  # 保存node节点到各个中心的距离
         # 对每个节点重新划分类别，选择一个最近的节点进行分类，类别为0-5
-        print(i)
+        # print(i)
         for node in nodes:
             temp = nodes_distance[node]  # 存放着3个距离
 
@@ -318,6 +320,53 @@ def k_means(m, K):
 # print(type(data))
 # print(data.x)
 # loader = DataLoader(data_list, batch_size=1)
+def draw(z,r):
+    colors = [
+            '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+            '#ffd700','green']
+    
+    # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
+    z = TSNE(n_components=2).fit_transform(z)
+    province_list = getProvince()
+    # z = np.c_[z,province_list]
+    
+    # z.append(province_list)
+    # print(z)
+    
+    result = r
+    print(type(result))
+    plt.figure(figsize=(8, 8))
+    
+    print(result.get(1))
+    print(z[result.get(1),0])
+    for j in range(K):
+        plt.scatter(z[result.get(j),0], z[result.get(j),1],s=450, color=colors[j], alpha=0.5)
+    for i in range(z.shape[0]):  ## for every node
+        plt.annotate(province_list[i], xy = (z[i,0],z[i,1]),  xytext=(-20, 10), textcoords = 'offset points',ha = 'center', va = 'top')    
+
+    # for i in range(z.shape[0]):  ## for every node
+    #     for j in range(K):
+    #         plt.scatter(z[i,0], z[i,1],s=450, color=colors[j], alpha=0.5)
+    #         print(z[i,0])
+    #         print(z[i,1])
+    #         plt.annotate(province_list[i], xy = (z[i,0],z[i,1]), textcoords = 'offset points',ha = 'center', va = 'top')
+
+    # 绘制不同类别的节点
+    # for i in range(dataset.num_classes):
+    #     # z[y==0, 0] 和 z[y==0, 1] 分别代表第一个类的节点的x轴和y轴的坐标
+    #     plt.scatter(z[y == i, 0], z[y == i, 1], s=450, color=colors[i], alpha=0.5)
+        
+        # plt.annotate(z[2,] xy = (x,y), textcoords = 'offset points',ha = 'center', va = 'top')
+    plt.axis('off')
+    plt.show()
+    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/GCN-2stage')    
+
+start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+logger = get_logger(start_time)
+# logger.get_logger()
+# logger.add_handler(start_time)
+logger.info("Begin")
+
 hidden_dim = 16
 
 #  定义2层GCN的网络.
@@ -352,10 +401,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 data = data.to(device)
 model = Net().to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=5e-4)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=5e-4)
 # @torch.no_grad()   #不需要计算梯度，也不进行反向传播
 
-iter_num = 200   
+iter_num = 10001   
 for epoch in range(iter_num):
     optimizer.zero_grad()#清空所有被优化的变量的梯度
     model.train()#设置成train模式
@@ -371,13 +420,14 @@ for epoch in range(iter_num):
      #损失函数训练参数用于节点分类
     optimizer.step()#步长
      
-    
+    logger.info(f'epoch{epoch + 1}   loss:{loss}')
     print(f'epoch{epoch + 1}   loss:{loss}')
     if epoch == iter_num-1:
         out = out.detach().cpu().numpy()
         result = k_means(out, K)
-        
-        print(result)
+        logger.info('Final Result:',result)
+        print('Final Result:',result)
+        draw(out,result)
     
 
 
@@ -407,3 +457,4 @@ for epoch in range(iter_num):
 
 # if __name__=='__main__':
 #     K_means()
+
