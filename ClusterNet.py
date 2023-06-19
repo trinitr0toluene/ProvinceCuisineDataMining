@@ -16,6 +16,8 @@ from models import cluster, GCNClusterNet, GCN
 from sklearn.manifold import TSNE
 from log import get_logger
 import datetime
+from CalModularity import Q
+import torch_geometric
 # from pylab import mpl
  
 # # 设置中文显示字体
@@ -33,7 +35,7 @@ node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_fea
 label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class.xlsx'
 k = 3
 
-K = 3
+K = 10
 #initialize
 edge_index = []
 start = []
@@ -300,8 +302,8 @@ def loss_modularity(r, bin_adj, mod):
 
 def draw(z,r):
     colors = [
-            '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
-            '#ffd700','green']
+            'pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+            '#ffd700']
     
     # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
     z = TSNE(n_components=2).fit_transform(z.detach().numpy())
@@ -310,13 +312,11 @@ def draw(z,r):
     
     # z.append(province_list)
     # print(z)
-    
-    r = r.detach().numpy()
-    result = np.argmax(r, axis=1)
+
     
     plt.figure(figsize=(8, 8))
     
-    
+    result = r
     for j in range(K):
         plt.scatter(z[result == j,0], z[result == j,1],s=450, color=colors[j], alpha=0.5)
     for i in range(z.shape[0]):  ## for every node
@@ -345,6 +345,8 @@ logger = get_logger(start_time)
 # logger.get_logger()
 # logger.add_handler(start_time)
 logger.info("Begin")
+logger.info(f'社区数目K：{K}')
+
 
 features = sp.csr_matrix(data.x, dtype=np.float32)
 # print(data.y)
@@ -360,6 +362,7 @@ features = torch.FloatTensor(np.array(features.todense()))# 将numpy的数据转
 adj = sparse_mx_to_torch_sparse_tensor(adj)
 adj = adj.coalesce()
 bin_adj_all = (adj.to_dense() > 0).float()
+print(f'adj:{adj} bin_adj_all:{bin_adj_all}')
 
 '''
     The ClusterNet architecture. The first step is a 2-layer GCN to generate embeddings.
@@ -453,7 +456,18 @@ for epoch in range(iter_num):
     optimizer.step()
     
     if epoch == iter_num-1:
-        logger.info(r)
+        logger.info(f'r:{r}')
+        r = r.detach().numpy()
+        r = np.argmax(r, axis=1)
+
+        # print(type(r))
+        adj_array = torch_geometric.utils.to_scipy_sparse_matrix(data.edge_index)
+        adj_array = adj_array.toarray()
+        # print(adj_array)
+        #计算模块度
+        score = Q(adj_array, r)
+        print(f'模块度为：{score}')
+        logger.info(f'模块度为：{score}')
         draw(embeds, r)
  
 
@@ -465,10 +479,25 @@ for epoch in range(iter_num):
     else:
         es += 1
         if es == 200:
+            
             print('Early Stop!')
             logger.info('Early Stop!')
+            r = r.detach().numpy()
+            r = np.argmax(r, axis=1)
+
+            # print(type(r))
+            adj_array = torch_geometric.utils.to_scipy_sparse_matrix(data.edge_index)
+            adj_array = adj_array.toarray()
+            # print(adj_array)
+            #计算模块度
+            score = Q(adj_array, r)
+            print(f'模块度为：{score}')
+            logger.info(f'模块度为：{score}')
             draw(embeds, r)
+
             break
 
 
 
+
+    

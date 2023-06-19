@@ -16,6 +16,8 @@ from log import get_logger
 import datetime
 from torch_geometric.utils.convert import to_networkx
 from sklearn.manifold import TSNE
+from CalModularity import Q
+import torch_geometric
 
 
 
@@ -24,7 +26,7 @@ from sklearn.manifold import TSNE
 
 edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/edge_features.xlsx'
 node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_features.xlsx'
-label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class.xlsx'
+label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class_new.xlsx'
 k = 3
 
 K = 3
@@ -119,13 +121,12 @@ def isTopK(data, data_list):
         return False
 
 def addClass():
-    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=0)
-    df_new = df.drop(df.columns[[0,1]], axis=1)
-    df_new['max_idx'] = df_new.idxmax(axis=1)
-    # print(df_new['max_idx'])
+    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=1)
+    
     global label
     
-    label = torch.tensor(df_new['max_idx'], dtype=torch.int64)
+    label = torch.tensor(df['class'], dtype=torch.int64)
+    print(label)
      
     
     # print(label)
@@ -215,7 +216,7 @@ class MyOwnDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/2stage')
+dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/2stage-sheet2')
 
 # print(dataset.num_classes) # 0
 # print(dataset[0].num_nodes) # 31
@@ -245,6 +246,14 @@ G = to_networkx(data)
 #     print(f"get_dis: {np.array(ret)}")
 #     print(len(ret))    
 #     return np.array(ret)
+
+# def edge_index_to_coo_adj(edge_index):
+#     x_sh=edge_index.shape[0]
+#     edge_shape= np.zeros((x_sh,x_sh)).shape
+#     value = torch.FloatTensor(np.ones(edge_index.shape[1]))
+#     adj = torch.sparse_coo_tensor(edge_index,value,edge_shape)
+#     adj = adj.toarray()
+#     return adj
 
 def calEuclidean(data, center):
     dist = np.sqrt(np.sum(np.square(data-center))) 
@@ -305,7 +314,7 @@ def k_means(m, K):
         centers.clear()
         for i in range(K):
             center = []
-            for j in range(8):
+            for j in range(dataset.num_classes):
                 t = [m[node][j] for node in res[i]]  # 第i个类别中所有node节点的第j个坐标
                 center.append(np.mean(t))
             centers.append(center)
@@ -334,11 +343,11 @@ def draw(z,r):
     # print(z)
     
     result = r
-    print(type(result))
+    # print(type(result))
     plt.figure(figsize=(8, 8))
     
-    print(result.get(1))
-    print(z[result.get(1),0])
+    # print(result.get(1))
+    # print(z[result.get(1),0])
     for j in range(K):
         plt.scatter(z[result.get(j),0], z[result.get(j),1],s=450, color=colors[j], alpha=0.5)
     for i in range(z.shape[0]):  ## for every node
@@ -366,6 +375,7 @@ logger = get_logger(start_time)
 # logger.get_logger()
 # logger.add_handler(start_time)
 logger.info("Begin")
+logger.info(f'label:{label}')
 
 hidden_dim = 16
 
@@ -407,7 +417,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
 logger.info(f'lr = {lr}  weight_decay:{wd}')
 # @torch.no_grad()   #不需要计算梯度，也不进行反向传播
 
-iter_num = 10001   
+iter_num = 101  
 for epoch in range(iter_num):
     optimizer.zero_grad()#清空所有被优化的变量的梯度
     model.train()#设置成train模式
@@ -416,7 +426,7 @@ for epoch in range(iter_num):
     label = data.y
     # one_hot = F.one_hot(label, num_classes = dataset.num_classes)
     # print(one_hot)
-
+    
     loss = F.nll_loss(model()[data.train_mask], label[data.train_mask])
     loss.requires_grad_(True)
     loss.backward()
@@ -430,7 +440,18 @@ for epoch in range(iter_num):
         result = k_means(out, K)
         logger.info(f'Final Result:{result}')
         print(f'Final Result:{result}')
+        # print(data.edge_index.cpu())
+        # adj_array = edge_index_to_adj(data.edge_index.cpu())
+
+        adj_array = torch_geometric.utils.to_scipy_sparse_matrix(data.edge_index)
+        adj_array = adj_array.toarray()
+        # print(adj_array)
+        #计算模块度
+        score = Q(adj_array, result)
+        print(f'模块度为：{score}')
+        logger.info(f'模块度为：{score}')
         draw(out,result)
+        # print(data.y)
     
 
 

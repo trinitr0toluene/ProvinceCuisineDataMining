@@ -13,6 +13,8 @@ from torch_geometric.data import InMemoryDataset
 from log import get_logger
 import datetime
 from torch_geometric.utils.convert import to_networkx
+import torch_geometric
+from CalModularity import Q
 
 
 
@@ -167,6 +169,14 @@ def draw(z,r):
     plt.show()
     plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/LPA_scatter')    
 
+def calculate(result):
+        adj_array = torch_geometric.utils.to_scipy_sparse_matrix(data.edge_index)
+        adj_array = adj_array.toarray()
+        # print(adj_array)
+        #计算模块度
+        score = Q(adj_array, result)
+        print(f'模块度为：{score}')
+        logger.info(f'模块度为：{score}')
 
 # build the PyG Dataset
 
@@ -231,15 +241,17 @@ logger.info("Begin")
 
 
 G = to_networkx(data)
+
+
 com = list(lpa(G))
-print('社区数量',len(com))
+print(f'社区数量:{len(com)}'  f'聚类结果：{com}')
 logger.info(f'社区数量:{len(com)}'  f'聚类结果：{com}')
 
 # 下面是画图
 pos = nx.spring_layout(G) # 节点的布局为spring型
 NodeId    = list(G.nodes())
-print(f'NodeId:{NodeId}')
-logger.info(f'NodeId:{NodeId}')
+# print(f'NodeId:{NodeId}')
+# logger.info(f'NodeId:{NodeId}')
 node_size = [G.degree(i)**1.2*90 for i in NodeId] # 节点大小
 
 plt.figure(figsize = (8,8)) # 设置图片大小
@@ -272,4 +284,5 @@ plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10
 
 draw(pos, com)
 
+calculate(com)
 
