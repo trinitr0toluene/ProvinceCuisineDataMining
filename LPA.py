@@ -256,7 +256,7 @@ node_size = [G.degree(i)**1.2*90 for i in NodeId] # 节点大小
 
 plt.figure(figsize = (8,8)) # 设置图片大小
 # print(pos)
-# print(com)
+# print(type(com[1]))
 nx.draw(G,pos, 
         with_labels=True, 
         node_size =node_size, 

@@ -329,6 +329,44 @@ def k_means(m, K):
 # print(type(data))
 # print(data.x)
 # loader = DataLoader(data_list, batch_size=1)
+def draw_nx(com):
+    # 下面是画图
+    pos = nx.spring_layout(G) # 节点的布局为spring型
+    NodeId    = list(G.nodes())
+    # print(f'NodeId:{NodeId}')
+    # logger.info(f'NodeId:{NodeId}')
+    node_size = [G.degree(i)**1.2*90 for i in NodeId] # 节点大小
+
+    plt.figure(figsize = (8,8)) # 设置图片大小
+    # print(pos)
+    # print(type(com[1]))
+    nx.draw(G,pos, 
+            with_labels=True, 
+            node_size =node_size, 
+            node_color='w', 
+            node_shape = '.'
+        )
+
+    '''
+    node_size表示节点大小
+    node_color表示节点颜色
+    with_labels=True表示节点是否带标签
+    '''
+    color_list = ['pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+                '#ffd700']
+    # print(len(com))
+    # print(f'type of com:{type(com)}')
+    # print(f'type of pos:{type(pos)}')
+    for i in range(K):
+        nx.draw_networkx_nodes(G, pos, 
+                            nodelist=com[i], 
+                            node_color = color_list[i+2],  
+                            label=True)
+    plt.show()
+    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/GCN-2stage_nx')
+
+
+
 def draw(z,r):
     colors = [
             '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
@@ -440,6 +478,7 @@ for epoch in range(iter_num):
         result = k_means(out, K)
         logger.info(f'Final Result:{result}')
         print(f'Final Result:{result}')
+        print(type(result))
         # print(data.edge_index.cpu())
         # adj_array = edge_index_to_adj(data.edge_index.cpu())
 
@@ -451,6 +490,7 @@ for epoch in range(iter_num):
         print(f'模块度为：{score}')
         logger.info(f'模块度为：{score}')
         draw(out,result)
+        draw_nx(result)
         # print(data.y)
     
 
