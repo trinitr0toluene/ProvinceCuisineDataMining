@@ -263,6 +263,10 @@ def calEuclidean(data, center):
 
 def calculate(result):
         adj_array = torch_geometric.utils.to_scipy_sparse_matrix(data.edge_index)
+        # adj_nx = nx.to_numpy_array(G).astype(float)
+        # print(f'adj_array:{adj_array}' f'adj_nx:{adj_nx}')
+        # if (adj_nx== adj_array).all():
+        #     print('True')
         adj_array = adj_array.toarray()
         # print(adj_array)
         #计算模块度
