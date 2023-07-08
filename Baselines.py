@@ -14,6 +14,9 @@ from log import get_logger
 import datetime
 from torch_geometric.utils.convert import to_networkx
 import torch_geometric
+from communities.algorithms import louvain_method
+from communities.visualization import draw_communities
+from communities.visualization import louvain_animation
 from CalModularity import Q
 
 
@@ -35,6 +38,7 @@ edge_attr = []
 node_feature = []
 label = []
 province_list = []
+label_pattern = 0
 
 def excel2edge(): 
     # open the edge features file and transform it into PyG version
@@ -116,7 +120,7 @@ def isTopK(data, data_list):
         return False
 
 def addClass():
-    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=0)
+    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=label_pattern)
     df_new = df.drop(df.columns[[0,1]], axis=1)
     df_new['max_idx'] = df_new.idxmax(axis=1)
     # print(df_new['max_idx'])
@@ -138,7 +142,7 @@ def getProvince():
 
 
 
-def draw(z,r):
+def draw(z,r,filename):
     colors = [
             'pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
             '#ffd700']
@@ -150,7 +154,7 @@ def draw(z,r):
     z = np.array(list(z.values()))
     # print(z)
     result = dict()
-    for index, item in enumerate(com):
+    for index, item in enumerate(r):
         result[index] = list(item)
     # print(result)
     # result = dict(enumerate(com))
@@ -167,7 +171,8 @@ def draw(z,r):
 
     plt.axis('off')
     plt.show()
-    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/LPA_scatter')    
+    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/'+filename+'_scatter')
+  
 
 def calculate(result):
         adj_array = torch_geometric.utils.to_scipy_sparse_matrix(data.edge_index)
@@ -228,7 +233,7 @@ class MyOwnDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/LPA')
+dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/label'+str(label_pattern)+'/')
 
 data_list = [dataset[0]]
 data = dataset[0]
@@ -237,52 +242,80 @@ data = dataset[0]
 start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 logger = get_logger(start_time)
 logger.info("Begin")
+logger.info(f'label:{label_pattern}')
 
+def draw_nx(com,filename):
+    # 下面是画图
+    
+    NodeId    = list(G.nodes())
+    # print(f'NodeId:{NodeId}')
+    # logger.info(f'NodeId:{NodeId}')
+    node_size = [G.degree(i)**1.2*90 for i in NodeId] # 节点大小
 
+    plt.figure(figsize = (8,8)) # 设置图片大小
+    # print(pos)
+    # print(type(com[1]))
+    nx.draw(G,pos, 
+            with_labels=True, 
+            node_size =node_size, 
+            node_color='w', 
+            node_shape = '.'
+        )
+
+    '''
+    node_size表示节点大小
+    node_color表示节点颜色
+    with_labels=True表示节点是否带标签
+    '''
+    color_list = ['pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+                '#ffd700']
+    # print(len(com))
+    # print(f'type of com:{type(com)}')
+    # print(f'type of pos:{type(pos)}')
+    for i in range(len(com)):
+        nx.draw_networkx_nodes(G, pos, 
+                            nodelist=com[i], 
+                            node_color = color_list[i+2],  
+                            label=True)
+    plt.show()
+    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/'+filename+'_nx')
 
 G = to_networkx(data)
-
-
-com = list(lpa(G))
-print(f'社区数量:{len(com)}'  f'聚类结果：{com}')
-logger.info(f'社区数量:{len(com)}'  f'聚类结果：{com}')
-
-# 下面是画图
 pos = nx.spring_layout(G) # 节点的布局为spring型
-NodeId    = list(G.nodes())
-# print(f'NodeId:{NodeId}')
-# logger.info(f'NodeId:{NodeId}')
-node_size = [G.degree(i)**1.2*90 for i in NodeId] # 节点大小
 
-plt.figure(figsize = (8,8)) # 设置图片大小
-# print(pos)
-# print(type(com[1]))
-nx.draw(G,pos, 
-        with_labels=True, 
-        node_size =node_size, 
-        node_color='w', 
-        node_shape = '.'
-       )
+def lpa_only():
+    adj_matrix = nx.to_numpy_array(G)
+    com = list(lpa(G))
+    print('LPA')
+    print(f'社区数量:{len(com)}'  f'聚类结果：{com}')
+    logger.info(f'LPA' f'社区数量:{len(com)}'  f'聚类结果：{com}')
 
-'''
-node_size表示节点大小
-node_color表示节点颜色
-with_labels=True表示节点是否带标签
-'''
-color_list = ['pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
-            '#ffd700']
-# print(len(com))
-# print(f'type of com:{type(com)}')
-# print(f'type of pos:{type(pos)}')
-for i in range(len(com)):
-    nx.draw_networkx_nodes(G, pos, 
-                           nodelist=com[i], 
-                           node_color = color_list[i+2],  
-                           label=True)
-plt.show()
-plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/LPA_nx')
+    draw(pos, com,filename = 'LPA')
+    draw_nx(com, filename = 'LPA')
+    print(f'nx库计算结果：{nx.community.modularity(G, com)}')
+    logger.info(f'nx库计算结果：{nx.community.modularity(G, com)}')
+    
+    # draw_communities(adj_matrix, com, filename = '/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/LPA_plot')
+    calculate(com)
 
-draw(pos, com)
+def louvain_only():
+    adj_matrix = nx.to_numpy_array(G)
+    com, frames = louvain_method(adj_matrix, n=None)
+    print('Louvain')
+    print(f'社区数量:{len(com)}'  f'聚类结果：{com}')
+    logger.info(f'Louvain:' f'社区数量:{len(com)}'  f'聚类结果：{com}')
 
-calculate(com)
+    draw(pos, com, filename = 'Louvain')
+    draw_nx(com, filename = 'Louvain')
+    print(f'nx库计算结果：{nx.community.modularity(G, com)}')
+    logger.info(f'nx库计算结果：{nx.community.modularity(G, com)}')
+
+    calculate(com)
+    # draw_communities(adj_matrix, com, filename = '/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/Louvain_plot')
+    # louvain_animation(adj_matrix, frames, filename = '/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/Louvain_anime')
+
+if __name__== "__main__" :
+    lpa_only()
+    louvain_only()
+
 

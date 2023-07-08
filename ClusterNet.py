@@ -36,7 +36,7 @@ node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_fea
 label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class.xlsx'
 k = 3
 
-K = 5
+K = 3
 #initialize
 edge_index = []
 start = []
@@ -47,6 +47,7 @@ node_feature = []
 # label=torch.rand(31)
 label = []
 province_list = []
+label_pattern = 0
 
 def excel2edge(): 
     # open the edge features file and transform it into PyG version
@@ -132,7 +133,7 @@ def isTopK(data, data_list):
 
 
 def addClass():
-    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=0)
+    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=label_pattern)
     df_new = df.drop(df.columns[[0,1]], axis=1)
     df_new['max_idx'] = df_new.idxmax(axis=1)
     # print(df_new['max_idx'])
@@ -212,7 +213,7 @@ class MyOwnDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/')
+dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/label'+str(label_pattern)+'/')
 
 # print(dataset.num_classes) # 0
 # print(dataset[0].num_nodes) # 31
@@ -297,15 +298,9 @@ def make_modularity_matrix(adj):
     mod = adj - degrees @ degrees.t() / adj.sum()
     return mod
 
-
-def loss_modularity(r, bin_adj, mod):
-    bin_adj_nodiag = bin_adj * (torch.ones(bin_adj.shape[0], bin_adj.shape[0]) - torch.eye(bin_adj.shape[0]))
-    return (1. / bin_adj_nodiag.sum()) * (r.t() @ mod @ r).trace()
-
-def draw_nx(com):
+def array2list(com):
     temp = []
-    
-    # 下面是画图
+        
     for j in range(K):
         l = []
         temp.append(l)
@@ -315,6 +310,18 @@ def draw_nx(com):
 
     print(temp)
     com = temp
+    return com
+    
+
+
+def loss_modularity(r, bin_adj, mod):
+    bin_adj_nodiag = bin_adj * (torch.ones(bin_adj.shape[0], bin_adj.shape[0]) - torch.eye(bin_adj.shape[0]))
+    return (1. / bin_adj_nodiag.sum()) * (r.t() @ mod @ r).trace()
+
+def draw_nx(com):
+    temp = array2list(com)
+    com = temp
+    
     pos = nx.spring_layout(G) # 节点的布局为spring型
     NodeId    = list(G.nodes())
     # print(f'NodeId:{NodeId}')
@@ -394,6 +401,7 @@ logger = get_logger(start_time)
 # logger.get_logger()
 # logger.add_handler(start_time)
 logger.info("Begin")
+logger.info(f'label:{label_pattern}')
 logger.info(f'社区数目K：{K}')
 
 
@@ -514,10 +522,15 @@ for epoch in range(iter_num):
         adj_array = adj_array.toarray()
         # print(adj_array)
         #计算模块度
+
         score = Q(adj_array, r)
         print(f'模块度为：{score}')
         logger.info(f'模块度为：{score}')
         draw(embeds, r)
+        com = array2list(r)
+        print(f'nx库计算结果：{nx.community.modularity(G, com)}')
+        logger.info(f'nx库计算结果：{nx.community.modularity(G, com)}')
+
  
 
     logger.info(f'epoch{epoch + 1}   ClusterNet value:{curr_test_loss}')
@@ -545,6 +558,9 @@ for epoch in range(iter_num):
             logger.info(f'模块度为：{score}')
             draw(embeds, r)
             draw_nx(r)
+            com = array2list(r)
+            print(f'nx库计算结果：{nx.community.modularity(G, com)}')
+            logger.info(f'nx库计算结果：{nx.community.modularity(G, com)}')
 
             break
 

@@ -40,6 +40,7 @@ edge_attr = []
 node_feature = []
 label = []
 province_list = []
+label_pattern = 1
 
 def excel2edge(): 
     # open the edge features file and transform it into PyG version
@@ -121,7 +122,7 @@ def isTopK(data, data_list):
         return False
 
 def addClass():
-    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=1)
+    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=label_pattern)
     
     global label
     
@@ -216,7 +217,7 @@ class MyOwnDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/2stage-sheet2')
+dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/label'+str(label_pattern)+'/')
 
 # print(dataset.num_classes) # 0
 # print(dataset[0].num_nodes) # 31
@@ -259,6 +260,17 @@ def calEuclidean(data, center):
     dist = np.sqrt(np.sum(np.square(data-center))) 
     # print(type(dist))
     return dist
+
+def dict2list(r):
+    com = []
+    for i in range(K):
+        l = r[i]
+        com.append(l)
+    return com    
+
+
+
+
 
 def k_means(m, K):
     """
@@ -363,7 +375,7 @@ def draw_nx(com):
                             node_color = color_list[i+2],  
                             label=True)
     plt.show()
-    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/GCN-2stage_nx')
+    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/GCN-kmeans_nx')
 
 
 
@@ -406,14 +418,15 @@ def draw(z,r):
         # plt.annotate(z[2,] xy = (x,y), textcoords = 'offset points',ha = 'center', va = 'top')
     plt.axis('off')
     plt.show()
-    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/GCN-2stage')    
+    plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/GCN-kmeans')    
 
 start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 logger = get_logger(start_time)
 # logger.get_logger()
 # logger.add_handler(start_time)
 logger.info("Begin")
-logger.info(f'label:{label}')
+logger.info(f'label:{label_pattern}')
+logger.info(f'社区数目K：{K}')
 
 hidden_dim = 16
 
@@ -491,6 +504,9 @@ for epoch in range(iter_num):
         logger.info(f'模块度为：{score}')
         draw(out,result)
         draw_nx(result)
+        com = dict2list(result)
+        print(f'nx库计算结果：{nx.community.modularity(G, com)}')
+        logger.info(f'nx库计算结果：{nx.community.modularity(G, com)}')
         # print(data.y)
     
 
