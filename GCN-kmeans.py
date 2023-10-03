@@ -29,7 +29,7 @@ node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_fea
 label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class_new.xlsx'
 k = 3
 
-K = 3
+K = 9
 
 #initialize
 edge_index = []
@@ -364,8 +364,9 @@ def draw_nx(com):
     node_color表示节点颜色
     with_labels=True表示节点是否带标签
     '''
-    color_list = ['pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
-                '#ffd700']
+    color_list = [
+            'pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+            '#ffd700']
     # print(len(com))
     # print(f'type of com:{type(com)}')
     # print(f'type of pos:{type(pos)}')
@@ -381,8 +382,8 @@ def draw_nx(com):
 
 def draw(z,r):
     colors = [
-            '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
-            '#ffd700','green']
+        'pink','orange','r','g','b','y','m','gray','c','brown', '#ffc0cb', '#bada55', '#008080', '#420420', '#7fe5f0', '#065535',
+        '#ffd700']
     
     # 使用TSNE先进行数据降维，形状为[num_nodes, 2]
     z = TSNE(n_components=2).fit_transform(z)
@@ -468,7 +469,7 @@ optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=wd)
 logger.info(f'lr = {lr}  weight_decay:{wd}')
 # @torch.no_grad()   #不需要计算梯度，也不进行反向传播
 
-iter_num = 101  
+iter_num = 1001  
 for epoch in range(iter_num):
     optimizer.zero_grad()#清空所有被优化的变量的梯度
     model.train()#设置成train模式

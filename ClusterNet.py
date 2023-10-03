@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import openpyxl
 import heapq
-
+import argparse
 import torch
 import torch.nn.functional as F
 from torch_geometric.nn import GCNConv
@@ -19,6 +19,8 @@ from log import get_logger
 import datetime
 from CalModularity import Q
 import torch_geometric
+import os
+import json
 # from pylab import mpl
  
 # # 设置中文显示字体
@@ -29,14 +31,70 @@ import torch_geometric
 
 
 # from torch.utils.tensorboard import SummaryWriter
+def parser_args():
+    parser = argparse.ArgumentParser(description='ClusterNet Training')
 
+
+    parser.add_argument('--epochs', default=1001, type=int, metavar='N',
+                        help='number of total epochs to run')
+
+    parser.add_argument('--lr', '--learning-rate', default=1e-3, type=float,
+                        metavar='LR', help='initial learning rate', dest='lr')
+    parser.add_argument('--seed', default=1, type=int,
+                        help='seed for initializing training. ')
+    parser.add_argument('--label', default = 0, type = int, help = 'label pattern for node class')
+    parser.add_argument('--num_class', default = 3, type = int, help = 'number of class for clustering')
+    parser.add_argument('--num_edge', default = 3, type = int, help = 'number of edge: num_province*num_edge')
+    parser.add_argument('--nhid', default = 50, type = int, help = 'hidden dim of ClusterNet')
+    parser.add_argument('--nout', default = 50, type = int, help = 'output dim of ClusterNet')
+    parser.add_argument('--dropout', default = 0.2, type = float, help = 'dropout parameter')
+    parser.add_argument('--cluster_temp', default = 50, type = int, help = 'cluster_temp for ClusterNet')
+    parser.add_argument('--wd', default = 5e-4, type = float, help = 'weight decay')
+
+    # parser.add_argument('--output', default = '/home/zhangziyi/code/ProvinceCuisineDataMining/Config')
+    
+    
+    args = parser.parse_args()
+    return args
+
+def get_args():
+    args = parser_args()
+    return args
+
+args = get_args()
 
 edge_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/edge_features.xlsx'
 node_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_features.xlsx'
 label_filepath = '/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/node_class.xlsx'
-k = 3
 
-K = 3
+K = args.num_class
+
+start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+logger = get_logger(start_time)
+# logger.get_logger()
+# logger.add_handler(start_time)
+logger.info("Begin")
+logger.info(f'label:{args.label}')
+logger.info(f'社区数目K：{args.num_class}')
+
+config_path = '/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/_config.json'
+
+with open(config_path, 'wt') as f:
+        json.dump(vars(args), f, indent=4) 
+logger.info("Full config saved to {}".format(config_path))
+
+
+
+if args.seed is not None:
+    torch.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.cuda.manual_seed(args.seed)
+    torch.cuda.manual_seed_all(args.seed)
+
+
+
 #initialize
 edge_index = []
 start = []
@@ -47,7 +105,6 @@ node_feature = []
 # label=torch.rand(31)
 label = []
 province_list = []
-label_pattern = 0
 
 def excel2edge(): 
     # open the edge features file and transform it into PyG version
@@ -123,7 +180,7 @@ def excel2node():
 
 def isTopK(data, data_list):
 
-    max_val_lis = heapq.nlargest(k, data_list)
+    max_val_lis = heapq.nlargest(args.num_edge, data_list)
     # print(max_val_lis)
     
     if(data in max_val_lis):
@@ -133,7 +190,7 @@ def isTopK(data, data_list):
 
 
 def addClass():
-    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=label_pattern)
+    df = pd.read_excel(f'{label_filepath}', engine='openpyxl', sheet_name=args.label)
     df_new = df.drop(df.columns[[0,1]], axis=1)
     df_new['max_idx'] = df_new.idxmax(axis=1)
     # print(df_new['max_idx'])
@@ -213,7 +270,7 @@ class MyOwnDataset(InMemoryDataset):
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0])
 
-dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/label'+str(label_pattern)+'/')
+dataset = MyOwnDataset(root='/home/zhangziyi/code/ProvinceCuisineDataMining/dataset/label'+str(args.label)+'/')
 
 # print(dataset.num_classes) # 0
 # print(dataset[0].num_nodes) # 31
@@ -396,14 +453,6 @@ def draw(z,r):
     plt.savefig('/home/zhangziyi/code/ProvinceCuisineDataMining/Log/'+start_time[:10]+'/'+start_time[11:]+'/cluster')    
 
 
-start_time = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-logger = get_logger(start_time)
-# logger.get_logger()
-# logger.add_handler(start_time)
-logger.info("Begin")
-logger.info(f'label:{label_pattern}')
-logger.info(f'社区数目K：{K}')
-
 
 features = sp.csr_matrix(data.x, dtype=np.float32)
 # print(data.y)
@@ -441,8 +490,8 @@ num_cluster_iter = 1
 losses = []
 
 
-model_cluster = GCNClusterNet(nfeat=data.x.size(1), nhid=50, nout=50, dropout=0.2, K=K, cluster_temp=50)
-optimizer = torch.optim.Adam(model_cluster.parameters(), lr=0.01, weight_decay=5e-4)
+model_cluster = GCNClusterNet(nfeat=data.x.size(1), nhid=args.nhid, nout=args.nout, dropout=args.dropout, K=K, cluster_temp=args.cluster_temp)
+optimizer = torch.optim.Adam(model_cluster.parameters(), lr=args.lr, weight_decay=args.wd)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 model_cluster.train()
 
@@ -458,7 +507,7 @@ model_cluster.train()
        grad_fn=<AddBackward0>)
     '''
 
-iter_num = 10001
+iter_num = args.epochs
 best_test_loss = 0
 for epoch in range(iter_num):
     
@@ -527,6 +576,7 @@ for epoch in range(iter_num):
         print(f'模块度为：{score}')
         logger.info(f'模块度为：{score}')
         draw(embeds, r)
+        draw_nx(r)
         com = array2list(r)
         print(f'nx库计算结果：{nx.community.modularity(G, com)}')
         logger.info(f'nx库计算结果：{nx.community.modularity(G, com)}')
